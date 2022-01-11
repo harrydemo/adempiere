@@ -1,0 +1,885 @@
+<!-- ====================================================== -->
+<!-- Adempiere Distribution Setup                            -->
+<!-- ====================================================== -->
+<!-- $Header: /cvs/adempiere/install/Adempiere/build.xml,v 1.4 2006/07/03 16:51:31 jjanke Exp $-->
+
+<project name="setup" default="setup" basedir=".">
+
+	<description>
+	This buildfile is used to setup the Adempiere Environment.
+	</description>
+
+	<property environment="env" />
+	<property name="envFile" value="AdempiereEnv.properties" />
+ 	<property name="server" value="nas" />
+
+	<patternset id="manifest.exclude">
+	  <exclude name="META-INF/*.DSA"/>
+	  <exclude name="META-INF/*.RSA"/>
+	  <exclude name="META-INF/*.SF"/>
+	  <exclude name="META-INF/MANIFEST.MF"/>
+	  <exclude name="META-INF/INDEX.LIST"/>
+	</patternset>
+
+
+	<!-- ==================================================== -->
+	<!-- Init                                                 -->
+	<!-- ==================================================== -->
+	<target name="setupInit"  description="initialization target">
+
+		<echo message="Adempiere Server Setup ===================" />
+		<echo message="ADEMPIERE_HOME = ${env.ADEMPIERE_HOME}" />
+
+		<!-- create the time stamp and environment -->
+		<tstamp />
+		<available file="${envFile}" property="envFileExists" />
+		<available file="lib/AdempiereOriginal.jar" type="file" property="adempiereOriginal.exists"/>
+		<available file="lib/webuiOriginal.war" type="file" property="webuiOriginal.exists"/>
+		<fail message="**** RUN_setup was not successful - please re-run ****" unless="envFileExists" />
+		<property file="${envFile}"/>
+		<filter filtersfile="${envFile}" />
+
+		<echo message="Environment   		= ${envFile}" />
+		<echo message="Java VM       		= ${ADEMPIERE_JAVA_TYPE}" />
+		<echo message="Database      		= ${ADEMPIERE_DB_TYPE}" />
+		<echo message="Apps Server   		= ${ADEMPIERE_APPS_TYPE}" />
+		<echo message="Apps Server Path  	= ${ADEMPIERE_APPS_PATH}" />
+		<echo message="AppsDeployment		= ${ADEMPIERE_APPS_DEPLOY}" />
+
+		<condition property="isOracle">
+			<or>
+				<equals arg1="Oracle" arg2="${ADEMPIERE_DB_TYPE}" />
+				<equals arg1="OracleXE" arg2="${ADEMPIERE_DB_TYPE}" />
+			</or>
+		</condition>
+		<condition property="isPostgres">
+			<equals arg1="PostgreSQL" arg2="${ADEMPIERE_DB_TYPE}" />
+		</condition>
+		<condition property="isMySQL">
+			<equals arg1="MySQL" arg2="${ADEMPIERE_DB_TYPE}" />
+		</condition>
+		<condition property="isMariaDB">
+			<equals arg1="MariaDB" arg2="${ADEMPIERE_DB_TYPE}" />
+		</condition>
+
+		<!-- Environment variables -->
+		<condition property="isWindows">
+			<os family="windows" />
+		</condition>
+		<condition property="isAppsWildfly">
+			<equals arg1="wildfly" arg2="${ADEMPIERE_APPS_TYPE}" />
+		</condition>
+		<condition property="isAppsGlassfish">
+			<equals arg1="glassfish" arg2="${ADEMPIERE_APPS_TYPE}" />
+		</condition>
+		<condition property="isAppsTomcat">
+			<equals arg1="tomcat" arg2="${ADEMPIERE_APPS_TYPE}" />
+		</condition>
+		<condition property="isAppsJetty">
+			<equals arg1="jetty" arg2="${ADEMPIERE_APPS_TYPE}" />
+		</condition>
+
+		<antcall target="datasourcePostgres" inheritall="true"/>
+		<antcall target="datasourceOracle" inheritall="true"/>
+		<antcall target="datasourceMySQL" inheritall="true"/>
+		<antcall target="datasourceMariaDB" inheritall="true"/>
+		
+		<echo message="Windows=${isWindows} Wildfly=${isAppsWildfly} Glassfish=${isAppsGlassfish} Tomcat=${isAppsTomcat} Jetty=${isAppsJetty}" />
+
+	</target>
+
+
+	<target name="wildflyHome" if="isAppsWildfly">
+		<echo message="Wildfly Home ${ADEMPIERE_APPS_PATH}"/>
+		<property name="WILDFLY_HOME" location="${ADEMPIERE_APPS_PATH}"/>
+		<property name="WILDFLY_BASE" location="${ADEMPIERE_APPS_DEPLOY}"/>
+	</target>
+
+	<target name="catalinaHome" if="isAppsTomcat">
+		<property name="CATALINA_HOME" location="${ADEMPIERE_APPS_PATH}"/>
+		<property name="CATALINA_BASE" location="${ADEMPIERE_APPS_DEPLOY}/.."/>
+		<echo message="Catalina Home ${CATALINA_HOME}"/>
+		<echo message="Catalina Base ${CATALINA_BASE}"/>
+	</target>
+
+	<target name="jettyHome" if="isAppsJetty">
+		<property name="JETTY_HOME" location="${ADEMPIERE_APPS_PATH}"/>
+		<property name="JETTY_BASE" location="${ADEMPIERE_APPS_DEPLOY}/.."/>
+		<echo message="Jetty Home ${JETTY_HOME}"/>
+		<echo message="Jetty Base ${JETTY_BASE}"/>
+	</target>
+
+	<target name="glassfishHome" if="isAppsGlassfish">
+		<property name="GLASSFISH_HOME" location="${ADEMPIERE_APPS_PATH}"/>
+		<property name="GLASSFISH_BASE" location="${ADEMPIERE_APPS_DEPLOY}"/>
+		<echo message="Glassfish Home ${GLASSFISH_HOME}"/>
+		<echo message="Glassfish Home ${GLASSFISH_BASE}"/>
+	</target>
+
+	<!-- ==================================================== -->
+	<!-- Windows Setup                                        -->
+	<!-- ==================================================== -->
+	<target name="setupWin" depends="setupInit,wildflyHome,catalinaHome,jettyHome,glassfishHome" if="isWindows"
+		description="Windows Setup">
+		<!--	Filter files No Overwrite	-->
+		<copy file="utils/myDBcopyTemplate.bat"
+			tofile="utils/myDBcopy.bat" filtering="yes" overwrite="no" />
+
+		<!--	Filter files Overwrite		-->
+		<copy file="utils/myEnvironmentTemplate.bat"
+			tofile="utils/myEnvironment.bat" filtering="yes" overwrite="yes" />
+
+		<replace file="utils/myEnvironment.bat">
+			<replacefilter token="@WILDFLY_HOME@" value="${WILDFLY_HOME}" />
+			<replacefilter token="@CATALINA_HOME@" value="${CATALINA_HOME}" />
+			<replacefilter token="@JETTY_HOME@" value="${JETTY_HOME}" />
+			<replacefilter token="@WILDFLY_BASE@" value="${WILDFLY_BASE}" />
+			<replacefilter token="@CATALINA_BASE@" value="${CATALINA_BASE}" />
+			<replacefilter token="@JETTY_BASE@" value="${JETTY_BASE}" />
+		</replace>
+
+		<copy file="utils/RUN_GetAdempiereTemplate.bat"
+			tofile="utils/RUN_GetAdempiere.bat" filtering="yes" overwrite="yes" />
+		<copy file="utils/RUN_PutExportTemplate.bat"
+			tofile="utils/RUN_PutExport.bat" filtering="yes" overwrite="yes" />
+		<copy file="utils/RUN_WinEnvTemplate.bat"
+			tofile="utils/RUN_WinEnv.bat" filtering="yes" overwrite="yes" />
+
+		<delete>
+			<fileset dir="." includes="**/*.sh" excludes="RUN_Adempiere.sh" />
+		</delete>
+
+
+
+	</target>
+
+
+	<!-- ==================================================== -->
+	<!-- Non Windows Setup                                    -->
+	<!-- ==================================================== -->
+	<target name="setupNonWin" depends="setupInit,wildflyHome,catalinaHome,jettyHome,glassfishHome" unless="isWindows"
+		description="Non Windows Setup">
+
+		<!--	Filter files No Overwrite	-->
+		<copy file="utils/myDBcopyTemplate.sh"
+			tofile="utils/myDBcopy.sh" filtering="yes" overwrite="no" />
+
+		<!--	Filter files Overwrite		-->
+		<copy file="utils/myEnvironmentTemplate.sh"
+			tofile="utils/myEnvironment.sh" filtering="yes" overwrite="yes" />
+
+		<replace file="utils/myEnvironment.sh">
+			<replacefilter token="@WILDFLY_HOME@" value="${WILDFLY_HOME}" />
+			<replacefilter token="@CATALINA_HOME@" value="${CATALINA_HOME}" />
+			<replacefilter token="@JETTY_HOME@" value="${JETTY_HOME}" />
+			<replacefilter token="@WILDFLY_BASE@" value="${WILDFLY_BASE}" />
+			<replacefilter token="@CATALINA_BASE@" value="${CATALINA_BASE}" />
+			<replacefilter token="@JETTY_BASE@" value="${JETTY_BASE}" />
+		</replace>	
+
+		<copy file="utils/RUN_GetAdempiereTemplate.sh"
+			tofile="utils/RUN_GetAdempiere.sh" filtering="yes" overwrite="yes" />
+		<copy file="utils/RUN_PutExportTemplate.sh"
+			tofile="utils/RUN_PutExport.sh" filtering="yes" overwrite="yes" />
+		<copy file="utils/RUN_UnixEnvTemplate.sh"
+			tofile="utils/RUN_UnixEnv.sh" filtering="yes" overwrite="yes" />
+
+		<!--	Fix OS stuff	-->
+		<fixcrlf srcdir="." eol="lf" eof="remove" includes="**/*.sh" />
+		<chmod dir="." perm="ugo+x" includes="**/*.sh" />
+
+		<delete>
+			<fileset dir="." includes="*.bat" excludes="RUN_Adempiere.bat" />
+			<fileset dir="utils" includes="**/*.bat" />
+		</delete>
+
+	</target>
+
+	<target name="backupAdempiereOriginal" unless="adempiereOriginal.exists">
+		<copy file="lib/Adempiere.jar" tofile="lib/AdempiereOriginal.jar" overwrite="yes" />
+	</target>
+	<target name="backupWebuiOriginal" unless="webuiOriginal.exists">
+		<copy file="lib/webui.war" tofile="lib/webuiOriginal.war" overwrite="yes" />
+	</target>
+
+	<!-- rebuild Adempiere.jar and webui.war to include possible customization and patches -->
+	<target name="setupALib" depends="setupInit, backupAdempiereOriginal">
+		<delete file="lib/packages.jar" failonerror="false"/>
+		<jar jarfile="lib/packages.jar" duplicate="preserve">
+			<!-- 2pack packages -->
+			<zipgroupfileset dir="packages" includes="**/lib/*.jar" casesensitive="no">
+				<patternset refid="manifest.exclude"/>
+			</zipgroupfileset>
+		</jar>
+		<jar jarfile="lib/Adempiere1.jar" index="yes" duplicate="preserve">
+			<!-- pack patches.jar and customization.jar into Adempiere.jar -->
+			<zipfileset src="lib/customization.jar" >
+				<patternset refid="manifest.exclude"/>
+			</zipfileset>
+			<!-- 2pack packages -->
+			<zipfileset src="lib/packages.jar" >
+				<patternset refid="manifest.exclude"/>
+			</zipfileset>
+			<zipfileset src="lib/patches.jar" >
+				<patternset refid="manifest.exclude"/>
+			</zipfileset>
+			<zipfileset src="lib/AdempiereOriginal.jar" >
+				<patternset refid="manifest.exclude"/>
+			</zipfileset>
+			<indexjars>
+				<pathelement path="lib/AdempiereCLib.jar"/>
+				<pathelement path="lib/CompiereJasperReqs.jar"/>
+			</indexjars>
+			<manifest>
+	        	<attribute name="Specification-Title" value="Adempiere"/>
+		        <attribute name="Specification-Version" value="${ADEMPIERE_VERSION}"/>
+		        <attribute name="Specification-Vendor" value="ADempiere"/>
+		        <attribute name="Implementation-Title" value="Adempiere ${ADEMPIERE_VERSION}"/>
+		        <attribute name="Implementation-Version" value="${ADEMPIERE_VERSION} ${DSTAMP}-${TSTAMP}"/>
+		        <attribute name="Implementation-Vendor" value="${ADEMPIERE_VENDOR}"/>
+		        <attribute name="Implementation-URL" value="http://www.adempiere.net"/>
+		        <attribute name="Main-Class" value="org.compiere.Adempiere"/>
+		        <attribute name="Class-Path" value="AdempiereSLib.jar"/>
+    		</manifest>
+	    </jar>
+
+		<!-- Sign Adempiere Jar -->
+		<signjar jar="lib/Adempiere1.jar" alias="${ADEMPIERE_KEYSTORECODEALIAS}"
+			storepass="${ADEMPIERE_KEYSTOREPASS}" keystore="${ADEMPIERE_KEYSTORE}" />
+		<copy file="lib/Adempiere1.jar" tofile="lib/Adempiere.jar" overwrite="yes" />
+
+		<!-- Sign patches Jar -->
+		<copy file="lib/patches.jar" tofile="lib/patches1.jar" overwrite="yes" />
+		<signjar jar="lib/patches1.jar" alias="${ADEMPIERE_KEYSTORECODEALIAS}"
+			storepass="${ADEMPIERE_KEYSTOREPASS}" keystore="${ADEMPIERE_KEYSTORE}" />
+		<copy file="lib/patches1.jar" tofile="lib/patches.jar" overwrite="yes" />
+
+		<!-- Sign customization Jar -->
+		<copy file="lib/customization.jar" tofile="lib/customization1.jar" overwrite="yes" />
+		<signjar jar="lib/customization1.jar" alias="${ADEMPIERE_KEYSTORECODEALIAS}"
+			storepass="${ADEMPIERE_KEYSTOREPASS}" keystore="${ADEMPIERE_KEYSTORE}" />
+		<copy file="lib/customization1.jar" tofile="lib/customization.jar" overwrite="yes" />
+
+		<!-- clean up -->
+		<delete  file="lib/Adempiere1.jar"/>
+		<delete  file="lib/patches1.jar"/>
+		<delete  file="lib/customization1.jar"/>
+	</target>
+
+	<!-- rebuild Adempiere.jar and webui.war to include possible customization and patches -->
+	<target name="setupWLib" depends="setupInit, backupWebuiOriginal">
+		<delete file="lib/zkpackages.jar" failonerror="false"/>
+		<jar jarfile="lib/zkpackages.jar" duplicate="preserve">
+			<!-- 2pack zkpackages -->
+			<zipgroupfileset dir="zkpackages" includes="**/lib/*.jar" casesensitive="no">
+				<patternset refid="manifest.exclude"/>
+			</zipgroupfileset>
+		</jar>
+		<zip destfile="lib/webui1.war" duplicate="preserve">
+			<!-- pack zkpatches.jar and zkcustomization.jar into webui.war -->
+			<zipfileset src="lib/zkcustomization.jar" >
+				<patternset refid="manifest.exclude"/>
+			</zipfileset>
+			<!-- 2pack zkpackages -->
+			<zipfileset src="lib/zkpackages.jar" >
+				<patternset refid="manifest.exclude"/>
+			</zipfileset>
+			<zipfileset src="lib/zkpatches.jar" >
+				<patternset refid="manifest.exclude"/>
+			</zipfileset>
+			<zipfileset src="lib/webuiOriginal.war" >
+				<patternset refid="manifest.exclude"/>
+			</zipfileset>
+	    </zip>
+
+		<copy file="lib/webui1.war" tofile="lib/webui.war" overwrite="yes" />
+		<!-- clean up -->
+		<delete  file="lib/webui1.war"/>
+	</target>
+
+	<!-- ==================================================== -->
+	<!-- Adempiere Client Lib                                  -->
+	<!-- ==================================================== -->
+	<target name="setupCLib" depends="setupInit"
+		description="Setup Adempiere Client Lib">
+
+		<!-- Delete Old		-->
+		<delete file="lib/AdempiereCLib.jar" failonerror="no" />
+		<delete file="lib/CClient.jar" failonerror="no" />
+		<delete file="lib/CTools.jar" failonerror="no" />
+
+		<!-- Create AdempiereCLib.jar file 	-->
+		<jar jarfile="lib/AdempiereCLib.jar" index="yes" duplicate="preserve">
+			<zipfileset src="lib/${ADEMPIERE_APPS_TYPE}.jar" >
+				<patternset refid="manifest.exclude"/>
+			</zipfileset>
+			<zipfileset src="lib/CCTools.jar">
+				<patternset refid="manifest.exclude"/>
+			</zipfileset>
+			<zipfileset src="lib/oracle.jar" >
+				<patternset refid="manifest.exclude"/>
+			</zipfileset>
+			<zipfileset src="lib/driver.jar" >
+				<patternset refid="manifest.exclude"/>
+			</zipfileset>
+
+			<manifest>
+				<attribute name="Specification-Title" value="Adempiere Client Library" />
+				<attribute name="Specification-Version" value="${ADEMPIERE_MAIN_VERSION}" />
+				<attribute name="Specification-Vendor" value="Adempiere" />
+				<attribute name="Implementation-Title" value="AdempiereCLib ${ADEMPIERE_MAIN_VERSION}" />
+				<attribute name="Implementation-Version" value="${ADEMPIERE_MAIN_VERSION} ${DSTAMP}-${TSTAMP}" />
+				<attribute name="Implementation-Vendor" value="Adempiere, Inc." />
+				<attribute name="Implementation-URL" value="http://www.adempiere.net" />
+			</manifest>
+		</jar>
+
+		<echo message="KeyStore=${ADEMPIERE_KEYSTORE} - Alias=${ADEMPIERE_KEYSTORECODEALIAS}" />
+		<!-- Sign AdempiereCLib Jar 		-->
+		<signjar jar="lib/AdempiereCLib.jar" alias="${ADEMPIERE_KEYSTORECODEALIAS}"
+			storepass="${ADEMPIERE_KEYSTOREPASS}" keystore="${ADEMPIERE_KEYSTORE}" />
+
+	</target>
+
+	<!-- ==================================================== -->
+	<!-- Adempiere Server Lib                                  -->
+	<!-- ==================================================== -->
+	<target name="setupSLib" depends="setupInit"
+		description="Setup Adempiere Server Lib">
+
+		<!-- Delete Old		-->
+		<delete file="lib/AdempiereSLib.jar" failonerror="no" />
+		<delete file="lib/CServer.jar" failonerror="no" />
+
+		<!-- Create AdempiereSLib.jar file 	-->
+		<jar jarfile="lib/AdempiereSLib.jar" index="yes" duplicate="preserve">
+			<zipfileset src="lib/CSTools.jar">
+				<patternset refid="manifest.exclude"/>
+				<exclude name="**/*.bsh"/>
+			</zipfileset>
+			<zipfileset src="lib/oracle.jar">
+				<patternset refid="manifest.exclude"/>
+			</zipfileset>
+			<zipfileset src="lib/driver.jar">
+				<patternset refid="manifest.exclude"/>
+			</zipfileset>
+			<zipfileset src="lib/CompiereJasperReqs.jar" >
+				<patternset refid="manifest.exclude"/>
+			</zipfileset>
+			<manifest>
+				<attribute name="Specification-Title" value="Adempiere Server Library" />
+				<attribute name="Specification-Version" value="${ADEMPIERE_MAIN_VERSION}" />
+				<attribute name="Specification-Vendor" value="Adempiere" />
+				<attribute name="Implementation-Title" value="AdempiereSLib ${ADEMPIERE_MAIN_VERSION}" />
+				<attribute name="Implementation-Version" value="${ADEMPIERE_MAIN_VERSION} ${DSTAMP}-${TSTAMP}" />
+				<attribute name="Implementation-Vendor" value="Adempiere, Inc." />
+				<attribute name="Implementation-URL" value="http://www.adempiere.net" />
+			</manifest>
+		</jar>
+
+		<!-- Sign AdempiereSLib Jar 		-->
+		<signjar jar="lib/AdempiereSLib.jar" alias="${ADEMPIERE_KEYSTORECODEALIAS}"
+			storepass="${ADEMPIERE_KEYSTOREPASS}" keystore="${ADEMPIERE_KEYSTORE}" />
+		<delete dir="buildSLib" />
+
+		<!-- Sign CompiereJasperReqs.jar for Java Web Start	-->
+		<signjar jar="lib/CompiereJasperReqs.jar" alias="${ADEMPIERE_KEYSTORECODEALIAS}"
+		   	storepass="${ADEMPIERE_KEYSTOREPASS}" keystore="${ADEMPIERE_KEYSTORE}" />
+
+	</target>
+
+	<!-- Sign other application jars -->
+	<target name="signOtherJars" depends="setupInit" >
+		<!-- Sign AdempiereRoot Jar 		-->
+		<copy file="lib/adempiereRoot.jar" tofile="lib/adempiereRoot1.jar" overwrite="yes" />
+		<signjar jar="lib/adempiereRoot1.jar" alias="${ADEMPIERE_KEYSTORECODEALIAS}"
+			storepass="${ADEMPIERE_KEYSTOREPASS}" keystore="${ADEMPIERE_KEYSTORE}" />
+		<copy file="lib/adempiereRoot1.jar" tofile="lib/adempiereRoot.jar" overwrite="yes" />
+		<delete file="lib/adempiereRoot1.jar"/>
+
+		<!-- Sign AdempiereApps Jar 		-->
+		<copy file="lib/adempiereApps.jar" tofile="lib/adempiereApps1.jar" overwrite="yes" />
+		<signjar jar="lib/adempiereApps1.jar" alias="${ADEMPIERE_KEYSTORECODEALIAS}"
+			storepass="${ADEMPIERE_KEYSTOREPASS}" keystore="${ADEMPIERE_KEYSTORE}" />
+		<copy file="lib/adempiereApps1.jar" tofile="lib/adempiereApps.jar" overwrite="yes" />
+		<delete file="lib/adempiereApps1.jar"/>
+	</target>
+
+
+	<!-- ==================================================== -->
+	<!-- Setup Lib                                            -->
+	<!-- ==================================================== -->
+	<target name="setupLib" depends="setupInit, setupWin, setupNonWin, setupCLib, setupSLib, setupALib, setupWLib, signOtherJars"
+		description="Setup Adempiere Lib directory">
+
+		<!--	Filter files Overwrite			-->
+		<copy file="${basedir}/utils/ftpPutExportTemplate.txt"
+			tofile="${basedir}/utils/ftpPutExport.txt" filtering="yes" overwrite="yes" />
+		<copy file="${basedir}/utils/ftpGetAdempiereTemplate.txt"
+			tofile="${basedir}/utils/ftpGetAdempiere.txt" filtering="yes" overwrite="yes" />
+		<copy file="${basedir}/utils/adempiereDirectTemplate.jnlp"
+			tofile="${basedir}/lib/adempiereDirect.jnlp" filtering="yes" overwrite="yes" />
+		<!--	Create Client Zip		-->
+		<zip zipfile="${basedir}/lib/AdempiereClient.zip">
+			<zipfileset dir="." prefix="Adempiere"
+				includes="*.html" />
+			<zipfileset dir="." prefix="Adempiere"
+				includes="RUN_Adempiere.*" />
+			<zipfileset dir="utils" prefix="Adempiere"
+				includes="WinEnv.js" />
+			<zipfileset dir="lib" prefix="Adempiere/lib"
+				includes="Adempiere.exe,*.ico,customization.jar,patches.jar,CompiereJasperReqs.jar,Adempiere.jar,AdempiereCLib.jar,adempiereDirect.jnlp,index.html,*.0" />
+		</zip>
+
+		<!--	Save properties		-->
+		<copy file="AdempiereEnv.properties"
+			tofile="AdempiereEnv.properties.save" />
+		<copy file="Adempiere.properties"
+			tofile="Adempiere.properties.save" />
+	</target>
+
+	<!-- Update application library -->
+	<target name="updateLib" depends="setupInit, setupWin, setupNonWin, setupALib, setupWLib, signOtherJars">
+		<!--	Create Client Zip		-->
+		<zip zipfile="${basedir}/lib/AdempiereClient.zip">
+			<zipfileset dir="." prefix="Adempiere"
+				includes="*.html" />
+			<zipfileset dir="." prefix="Adempiere"
+				includes="RUN_Adempiere.*" />
+			<zipfileset dir="utils" prefix="Adempiere"
+				includes="WinEnv.js" />
+			<zipfileset dir="lib" prefix="Adempiere/lib"
+				includes="Adempiere.exe,*.ico,customization.jar,patches.jar,CompiereJasperReqs.jar,Adempiere.jar,AdempiereCLib.jar,adempiereDirect.jnlp,index.html,*.0" />
+		</zip>
+	</target>
+
+	<target name="createEAR" >
+		<!-- Create adempiereRoot war		-->
+		<zip destfile="${basedir}/lib/adempiereRoot.war">
+			<!-- copy Base	-->
+			<zipfileset src="${basedir}/lib/adempiereRootBase.war" />
+			<!--zipfileset dir="${basedir}/lib"
+				includes="adempiereDirect.jnlp"/-->
+			<!-- copy to adempiereHome	-->
+			<zipfileset dir="${basedir}/lib"
+				includes="AdempiereClient.zip,Adempiere.jar,AdempiereCLib.jar,*.jnlp,*.0,*.html,CompiereJasperReqs.jar,CompiereJasper.jar"
+				prefix="adempiereHome" />
+		</zip>
+
+		<!-- Create adempiereWebCM war		-->
+		<zip destfile="${basedir}/lib/adempiereWebCM.war">
+			<!-- copy Base	-->
+			<zipfileset src="${basedir}/lib/adempiereWebCMbase.war" />
+		</zip>
+
+		<antcall target="wildflyEAR" inheritall="true"/>
+		<antcall target="glassfishEAR" inheritall="true"/>
+		<antcall target="tomcatWAR" inheritall="true"/>
+		<antcall target="jettyWAR" inheritall="true"/>
+	</target>
+
+	<target name="wildflyEAR" if="isAppsWildfly">
+		<!-- bundle everything in one ear file for simpler deployment -->
+		<ear destfile="${basedir}/lib/adempiere.ear" appxml="${basedir}/lib/adempiereAll.xml" >
+			<fileset dir="${basedir}/lib" includes="Adempiere.jar,AdempiereSLib.jar,adempiereRoot.jar,adempiereApps.jar,adempiereApps.war,adempiereRoot.war,adempiereWebStore.war,adempiereWebCM.war,webui.war,mobile.war,ADInterface-1.0.war" />
+			<metainf dir="${basedir}/lib" includes="wildfly-ds.xml"/>
+		</ear>
+		<copy file="${basedir}/lib/adempiere.ear" tofile="${ADEMPIERE_APPS_DEPLOY}/deployments/adempiere.ear" overwrite="yes"/>
+	</target>
+
+	<target name="glassfishEAR" if="isAppsGlassfish">
+
+		<unzip src="${basedir}/lib/webui.war" dest="${basedir}/lib/webui"/>
+		<copy file="${basedir}/lib/webui/WEB-INF/web-2.5.xml" tofile="${basedir}/lib/webui/WEB-INF/web.xml" overwrite="true" />
+		<delete file="${basedir}/lib/webui.war"/>
+		<zip destfile="${basedir}/lib/webui.war" basedir="${basedir}/lib/webui" />
+		<delete dir="${basedir}/lib/webui"/>
+
+		<!-- bundle everything in one ear file for simpler deployment -->
+		<ear destfile="${basedir}/lib/adempiere.ear" appxml="${basedir}/lib/adempiereAll.xml" >
+			<fileset dir="${basedir}/lib"
+				includes="adempiereRoot.jar,adempiereApps.jar,adempiereApps.war,adempiereRoot.war,adempiereWebStore.war,adempiereWebCM.war,webui.war,mobile.war,ADInterface-1.0.war" />
+			<metainf dir="${basedir}/glassfish" includes="sun-application.xml"/>
+		</ear>
+	</target>
+
+	<target name="tomcatWAR" if="isAppsTomcat" depends="setupInit">
+	</target>
+
+	<target name="jettyWAR" if="isAppsJetty" depends="setupInit">
+	</target>
+
+	<target name="datasourcePostgres" depends= "driverPostgres" if="isPostgres">
+		<echo message="Database ${ADEMPIERE_DB_TYPE}" />
+		<!--antcall target="driverPostgres" inheritall="true"/-->
+		<copy file="${basedir}/lib/postgresql-ds.xml" tofile="${basedir}/lib/wildfly-ds.xml" overwrite="yes" filtering="yes"/>
+		<copy file="${basedir}/lib/postgresql.jar" tofile="${basedir}/lib/driver.jar" overwrite="yes"/>
+		<replace file="${basedir}/lib/wildfly-ds.xml">
+			<replacefilter token="@ADEMPIERE_DB_URL@" value="${ADEMPIERE_DB_URL}" />
+			<replacefilter token="@ADEMPIERE_DB_USER@" value="${ADEMPIERE_DB_USER}" />
+			<replacefilter token="@ADEMPIERE_DB_PASSWORD@" value="${ADEMPIERE_DB_PASSWORD}" />
+			<replacefilter token="@@JDBC_DRIVER_CLASS@@" value="${JDBC_DRIVER_CLASS}" />
+		</replace>
+	</target>
+
+	<target name="datasourceOracle" depends= "driverOracle" if="isOracle">
+		<echo message="Database ${ADEMPIERE_DB_TYPE}" />
+		<!--antcall target="driverOracle" inheritall="true"/-->
+		<copy file="${basedir}/lib/oracle-ds.xml" tofile="${basedir}/lib/wildfly-ds.xml" overwrite="yes" filtering="yes"/>
+		<copy file="${basedir}/lib/oracle.jar" tofile="${basedir}/lib/driver.jar" overwrite="yes"/>
+		<replace file="${basedir}/lib/wildfly-ds.xml">
+			<replacefilter token="@ADEMPIERE_DB_URL@" value="${ADEMPIERE_DB_URL}" />
+			<replacefilter token="@ADEMPIERE_DB_USER@" value="${ADEMPIERE_DB_USER}" />
+			<replacefilter token="@ADEMPIERE_DB_PASSWORD@" value="${ADEMPIERE_DB_PASSWORD}" />
+			<replacefilter token="@ADEMPIERE_DB_URL@" value="${ADEMPIERE_DB_URL}" />
+			<replacefilter token="@@JDBC_DRIVER_CLASS@@" value="${JDBC_DRIVER_CLASS}" />
+		</replace>
+	</target>
+
+	<target name="datasourceMySQL" depends= "driverMySQL" if="isMySQL">
+		<echo message="Database ${ADEMPIERE_DB_TYPE}" />
+		<!--antcall target="driverMySQL" inheritall="true"/-->
+		<copy file="${basedir}/lib/mysql-ds.xml" tofile="${basedir}/lib/wildfly-ds.xml" overwrite="yes" filtering="yes"/>
+		<copy file="${basedir}/lib/mysql-connector-java-5.1.13-bin.jar" tofile="${basedir}/lib/driver.jar" overwrite="yes"/>
+		<replace file="${basedir}/lib/wildfly-ds.xml">
+			<replacefilter token="@ADEMPIERE_DB_URL@" value="${ADEMPIERE_DB_URL}" />
+			<replacefilter token="@ADEMPIERE_DB_USER@" value="${ADEMPIERE_DB_USER}" />
+			<replacefilter token="@ADEMPIERE_DB_PASSWORD@" value="${ADEMPIERE_DB_PASSWORD}" />
+			<replacefilter token="@ADEMPIERE_DB_URL@" value="${ADEMPIERE_DB_URL}" />
+			<replacefilter token="@@JDBC_DRIVER_CLASS@@" value="${JDBC_DRIVER_CLASS}" />
+		</replace>
+	</target>
+
+	<target name="datasourceMariaDB" depends= "driverMariaDB" if="isMariaDB">
+		<echo message="Database ${ADEMPIERE_DB_TYPE}" />
+		<!--antcall target="driverMariaDB" inheritall="true"/-->
+		<copy file="${basedir}/lib/mariadb-ds.xml" tofile="${basedir}/lib/wildfly-ds.xml" overwrite="yes" filtering="yes"/>
+		<copy file="${basedir}/lib/mysql-connector-java-5.1.13-bin.jar" tofile="${basedir}/lib/driver.jar" overwrite="yes"/>
+		<replace file="${basedir}/lib/wildfly-ds.xml">
+			<replacefilter token="@ADEMPIERE_DB_URL@" value="${ADEMPIERE_DB_URL}" />
+			<replacefilter token="@ADEMPIERE_DB_USER@" value="${ADEMPIERE_DB_USER}" />
+			<replacefilter token="@ADEMPIERE_DB_PASSWORD@" value="${ADEMPIERE_DB_PASSWORD}" />
+			<replacefilter token="@ADEMPIERE_DB_URL@" value="${ADEMPIERE_DB_URL}" />
+			<replacefilter token="@@JDBC_DRIVER_CLASS@@" value="${JDBC_DRIVER_CLASS}" />
+		</replace>
+	</target>
+
+	<target name="driverPostgres" if="isPostgres">
+		<property name="JDBC_DRIVER_CLASS" value="org.postgresql.Driver"/>
+		<echo message="Driver = ${JDBC_DRIVER_CLASS}" />
+	</target>
+
+	<target name="driverOracle" if="isOracle">
+		<property name="JDBC_DRIVER_CLASS" value="oracle.jdbc.OracleDriver"/>
+		<echo message="Driver = ${JDBC_DRIVER_CLASS}" />
+	</target>
+
+	<target name="driverMySQL" if="isMySQL">
+		<property name="JDBC_DRIVER_CLASS" value="com.mysql.jdbc.Driver"/>
+		<echo message="Driver = ${JDBC_DRIVER_CLASS}"/>
+	</target>
+
+	<target name="driverMariaDB" if="isMariaDB">
+		<property name="JDBC_DRIVER_CLASS" value="org.mariadb.jdbc.Driver"/>
+		<echo message="Driver = ${JDBC_DRIVER_CLASS}" />
+	</target>
+
+	<!-- ==================================================== -->
+	<!-- Setup EAR Libraries                                  -->
+	<!-- ==================================================== -->
+	<target name="setupEAR" depends="setupLib"
+		description="Setup Adempiere EAR Libraries">
+
+		<antcall target="createEAR" inheritall="true"/>
+	</target>
+
+	<target name="updateEAR" depends="updateLib">
+		<antcall target="createEAR" inheritall="true"/>
+	</target>
+
+	<target name="updateWildfly" depends="wildflyHome, updateEAR" if="isAppsWildfly"
+			description="Update Wildfly Application Server">
+
+		<!-- Copy			-->
+		<echo message="AppsDeployment= ${ADEMPIERE_APPS_DEPLOY}" />
+		<!-- Deploy in exploded format for faster startup time -->
+		<copy file="${basedir}/lib/Adempiere.jar" tofile="${WILDFLY_BASE}/lib/ext/Adempiere.jar" overwrite="yes"/>
+		<copy file="${basedir}/lib/AdempiereSLib.jar" tofile="${WILDFLY_BASE}/lib/ext/AdempiereSLib.jar"  overwrite="yes"/>
+		<copy file="${basedir}/lib/adempiereApps.jar" tofile="${WILDFLY_BASE}/lib/ext/adempiereApps.jar"  overwrite="yes"/>
+	</target>
+
+    <!-- ==================================================== -->
+	<!-- Setup Glassfish (Sun Application Server)             -->
+	<!-- ==================================================== -->
+	<target name="setupGlassfish" depends="setupLib, setupEAR" if="isAppsGlassfish"
+		description="Setup Glassfish Application Server">
+		<copy file="${basedir}/lib/adempiere.ear" tofile="${basedir}/glassfish/adempiere.ear"/>
+		<copy file="${basedir}/lib/Adempiere.jar" tofile="${basedir}/glassfish/Adempiere.jar"/>
+		<copy file="${basedir}/lib/AdempiereSLib.jar" tofile="${basedir}/glassfish/AdempiereSLib.jar"/>
+	</target>
+
+	<!-- ==================================================== -->
+	<!-- Setup Tomcat              -->
+	<!-- ==================================================== -->
+	<target name="setupTomcat" depends="driverPostgres, driverOracle , driverMySQL , driverMariaDB, catalinaHome , setupLib, setupEAR " if="isAppsTomcat"
+		description="Setup tomcat Server">
+
+		<echo message="Tomcat Home : ${CATALINA_HOME}"/>
+		<echo message="Tomcat Base : ${CATALINA_BASE}"/>
+
+		<mkdir dir="${CATALINA_BASE}/logs"/>
+		<delete dir="${CATALINA_BASE}/bin"/>
+		<delete dir="${CATALINA_BASE}/temp"/>
+		<mkdir dir="${CATALINA_BASE}/bin"/>
+		<mkdir dir="${CATALINA_BASE}/temp"/>
+
+		<echo file="${CATALINA_BASE}/bin/startup.bat" append="false">
+set CATALINA_BASE="${CATALINA_BASE}"
+set CATALINA_TMPDIR="${CATALINA_BASE}\temp"
+set CATALINA_PID="${CATALINA_BASE}\tomcat.pid"
+%CATALINA_HOME%\bin\startup.bat
+		</echo>
+			
+		<echo file="${CATALINA_BASE}/bin/startup.sh" append="false">#\!/bin/tcsh
+export CATALINA_BASE=${CATALINA_BASE}
+export CATALINA_TMPDIR=${CATALINA_BASE}/temp
+export CATALINA_PID=${CATALINA_BASE}/tomcat.pid
+$CATALINA_HOME/bin/startup.sh
+		</echo>
+
+		<echo file="${CATALINA_BASE}/bin/shutdown.bat" append="false">
+%CATALINA_HOME%\bin\shutdown.bat
+		</echo>
+				
+		<echo file="${CATALINA_BASE}/bin/shutdown.sh" append="false">#\!/bin/tcsh
+$CATALINA_HOME/bin/shutdown.sh
+		</echo>
+
+		<chmod dir="${CATALINA_BASE}/bin" perm="ugo+rx" includes="**/*.sh"/>
+
+		<copy file="${CATALINA_HOME}/bin/tomcat-juli.jar" tofile="${CATALINA_BASE}/bin/tomcat-juli.jar" failonerror="false"/>
+		<delete dir="${CATALINA_BASE}/conf"/>
+		<copy todir="${CATALINA_BASE}/conf" failonerror="false">
+			<fileset dir="${CATALINA_HOME}/conf" includes="**"/>
+		</copy>	
+
+		<delete dir="${ADEMPIERE_APPS_DEPLOY}/mobile" />
+		<delete dir="${ADEMPIERE_APPS_DEPLOY}/webui" />
+		<delete dir="${ADEMPIERE_APPS_DEPLOY}/admin" />
+		<delete dir="${ADEMPIERE_APPS_DEPLOY}/wstore" />
+
+		<!--Setting the ADempiere Web Applications -->
+		<copy file="${basedir}/lib/adempiereRoot.war" tofile="${ADEMPIERE_APPS_DEPLOY}/admin.war"/>
+		<copy file="${basedir}/lib/adempiereApps.war" tofile="${ADEMPIERE_APPS_DEPLOY}/adempiere.war"/>
+		<copy file="${basedir}/lib/webui.war" tofile="${ADEMPIERE_APPS_DEPLOY}/webui.war"/>
+		<copy file="${basedir}/lib/mobile.war" tofile="${ADEMPIERE_APPS_DEPLOY}/mobile.war"/>
+		<copy file="${basedir}/lib/adempiereWebStore.war" tofile="${ADEMPIERE_APPS_DEPLOY}/wstore.war"/>
+		<copy file="${basedir}/lib/adempiereWebCM.war" tofile="${ADEMPIERE_APPS_DEPLOY}/ROOT.war"/>
+		<copy file="${basedir}/lib/ADInterface-1.0.war" tofile="${ADEMPIERE_APPS_DEPLOY}/ADInterface.war"/>
+
+		<!--Setting the ADempiere Shared Libraries -->
+		<delete dir="${CATALINA_BASE}/shared/lib"/>
+		<mkdir dir="${CATALINA_BASE}/shared/lib"/>
+		<copy file="${basedir}/lib/Adempiere.jar" tofile="${CATALINA_BASE}/shared/lib/Adempiere.jar" overwrite="true"/>
+		<copy file="${basedir}/lib/adempiereRoot.jar" tofile="${CATALINA_BASE}/shared/lib/adempiereRoot.jar" overwrite="true"/>
+		<copy file="${basedir}/lib/AdempiereSLib.jar" tofile="${CATALINA_BASE}/shared/lib/AdempiereSLib.jar" overwrite="true"/>
+		<copy file="${basedir}/lib/adempiereApps.jar" tofile="${CATALINA_BASE}/shared/lib/adempiereApps.jar" overwrite="true"/>
+		<replaceregexp file="${CATALINA_BASE}/conf/catalina.properties" match="shared.loader=" replace='shared.loader="${catalina.base}/shared/lib","${catalina.base}/shared/lib/*.jar"' byline="true"/>
+		<replaceregexp file="${CATALINA_BASE}/conf/catalina.properties" match="xom-\*.jar" replace='xom-\*.jar,\\\\${line.separator}Adempiere.jar,\\\\${line.separator}adempiereRoot.jar,\\\\${line.separator}AdempiereSLib.jar,\\\\${line.separator}adempiereApps.jar,\\\\${line.separator}javax.mail.jar' byline="true"/>
+		<!--Setting the Connection Pool-->
+
+		<copy file="${basedir}/lib/context.xml" tofile="${CATALINA_BASE}/conf/context.xml" filtering="yes" overwrite="yes"/>
+		<echo message="Database Driver Class ${JDBC_DRIVER_CLASS}" />	
+		<replace file="${CATALINA_BASE}/conf/context.xml">
+			<replacefilter token="@@JDBC_DRIVER_CLASS@@" value="${JDBC_DRIVER_CLASS}"/>
+		</replace>
+
+		<!-- Setting Tomcat Server -->
+		<replaceregexp file="${CATALINA_BASE}/conf/server.xml" match="8080" replace="${ADEMPIERE_WEB_PORT}" byline="true"/>
+		<replaceregexp file="${CATALINA_BASE}/conf/server.xml" match="8443" replace="${ADEMPIERE_SSL_PORT}" byline="true"/>
+		<replaceregexp file="${CATALINA_BASE}/conf/server.xml" match="&#60;/Server&#62;" replace="" byline="true"/>
+		<replaceregexp file="${CATALINA_BASE}/conf/server.xml" match="  &#60;/Service&#62;" replace="" byline="true"/>
+		<concat destfile="${CATALINA_BASE}/conf/server.xml" append="true">
+<![CDATA[    <Connector
+            protocol="org.apache.coyote.http11.Http11NioProtocol"
+			compression="on" noCompressionUserAgents="gozilla, traviata" compressionMinSize="2048" compressableMimeType ="text/html,text/xml,text/plain,text/css,text/javascript"/>
+            port="${ADEMPIERE_SSL_PORT}" maxThreads="200"
+            scheme="https" secure="true" SSLEnabled="true"
+            keystoreFile="${ADEMPIERE_KEYSTORE}" keystorePass="${ADEMPIERE_KEYSTOREPASS}"
+            clientAuth="false" sslProtocol="TLS"/>
+
+    <Connector port="8009" protocol="AJP/1.3" redirectPort="${ADEMPIERE_SSL_PORT}" secretRequired="false"/>
+
+  </Service>
+</Server>
+]]>
+		</concat>
+	</target>
+
+	<!-- ==================================================== -->
+	<!-- Setup Tomcat              -->
+	<!-- ==================================================== -->
+	<target name="setupJetty" depends="driverPostgres, driverOracle , driverMySQL , driverMariaDB, jettyHome, setupLib, setupEAR " if="isAppsJetty" description="Setup jetty Server">
+
+		<echo message="Jetty Home : ${JETTY_HOME}"/>
+		<echo message="Jetty Base : ${JETTY_BASE}"/>
+		<delete dir="${ADEMPIERE_APPS_DEPLOY}/mobile" />
+		<delete dir="${ADEMPIERE_APPS_DEPLOY}/webui" />
+		<delete dir="${ADEMPIERE_APPS_DEPLOY}/admin" />
+		<delete dir="${ADEMPIERE_APPS_DEPLOY}/wstore" />
+
+		<mkdir dir="${basedir}/jetty/webapps"/>
+		<copy file="${basedir}/lib/adempiereRoot.war" tofile="${ADEMPIERE_APPS_DEPLOY}/admin.war"/>
+		<copy file="${basedir}/lib/adempiereApps.war" tofile="${ADEMPIERE_APPS_DEPLOY}/adempiere.war"/>
+		<copy file="${basedir}/lib/webui.war" tofile="${ADEMPIERE_APPS_DEPLOY}/webui.war"/>
+		<copy file="${basedir}/lib/mobile.war" tofile="${ADEMPIERE_APPS_DEPLOY}/mobile.war"/>
+		<copy file="${basedir}/lib/adempiereWebStore.war" tofile="${ADEMPIERE_APPS_DEPLOY}/wstore.war"/>
+		<copy file="${basedir}/lib/adempiereWebCM.war" tofile="${ADEMPIERE_APPS_DEPLOY}/ROOT.war"/>
+		<copy file="${basedir}/lib/ADInterface-1.0.war" tofile="${ADEMPIERE_APPS_DEPLOY}/ADInterface.war"/>
+
+		<mkdir dir="${JETTY_BASE}/lib/ext"/>
+		<copy file="${basedir}/lib/Adempiere.jar" tofile="${JETTY_BASE}/lib/ext/Adempiere.jar" overwrite="true" />
+		<copy file="${basedir}/lib/adempiereRoot.jar" tofile="${JETTY_BASE}/lib/ext/adempiereRoot.jar" overwrite="true" />
+		<copy file="${basedir}/lib/AdempiereSLib.jar" tofile="${JETTY_BASE}/lib/ext/AdempiereSLib.jar" overwrite="true" />
+		<copy file="${basedir}/lib/adempiereApps.jar" tofile="${JETTY_BASE}/lib/ext/adempiereApps.jar" overwrite="true" />
+
+		<echo message="JDBC Driver =${JDBC_DRIVER_CLASS} for ${ADEMPIERE_APPS_DEPLOY}" />
+		<copy file="${basedir}/lib/jetty-ds.xml" tofile="${JETTY_BASE}/jetty-ds.xml" filtering="yes" overwrite="yes"/>
+		<replace file="${JETTY_BASE}/jetty-ds.xml">
+			<replacefilter token="@@JDBC_DRIVER_CLASS@@" value="${JDBC_DRIVER_CLASS}" />
+		</replace>
+	</target>
+
+	<!-- ==================================================== -->
+	<!-- Setup Wildfly Server                                   -->
+	<!-- ==================================================== -->
+	<target name="setupWildfly" depends="setupEAR" if="isAppsWildfly"
+			description="Setup Wildfly Application Server">
+
+		<!-- Copy			-->
+		<echo message="AppsDeployment=${ADEMPIERE_APPS_DEPLOY}" />
+		<copy todir="${ADEMPIERE_APPS_DEPLOY}" failonerror="false">
+			<fileset dir="${ADEMPIERE_APPS_PATH}/standalone" includes="**"/>
+		</copy>
+		<!-- Deploy in exploded format for faster startup time -->
+		<copy file="${basedir}/lib/Adempiere.jar" tofile="${ADEMPIERE_APPS_DEPLOY}/lib/ext/Adempiere.jar" overwrite="yes"/>
+		<copy file="${basedir}/lib/AdempiereSLib.jar" tofile="${ADEMPIERE_APPS_DEPLOY}/lib/ext/AdempiereSLib.jar"  overwrite="yes"/>
+		<copy file="${basedir}/lib/adempiereApps.jar" tofile="${ADEMPIERE_APPS_DEPLOY}/lib/ext/adempiereApps.jar"  overwrite="yes"/>
+	</target>
+
+
+	<!-- ==================================================== -->
+	<!-- Update J2EE Server                                   -->
+	<!-- ==================================================== -->
+	<target name="updateDeploy" depends="updateWildfly"
+		description="Update Adempiere Application Server">
+		<echo message="AppsDeployment= ${ADEMPIERE_APPS_DEPLOY}" />
+	</target>
+
+	<!-- ==================================================== -->
+	<!-- Deploy J2EE Server                                   -->
+	<!-- ==================================================== -->
+	<target name="setupDeploy" depends="setupWildfly, setupGlassfish, setupTomcat, setupJetty"
+		description="Deploy Adempiere Application Server">
+		<echo message="AppsDeployment= ${ADEMPIERE_APPS_DEPLOY}" />
+	</target>
+
+	<!-- ==================================================== -->
+	<!-- Update (Main)                                         -->
+	<!-- ==================================================== -->
+	<target name="update" depends="updateDeploy"
+		description="Update Adempiere Deployment">
+	</target>
+
+	<!-- ==================================================== -->
+	<!-- Setup (Main)                                         -->
+	<!-- ==================================================== -->
+	<target name="setup" depends="setupDeploy"
+		description="Setup Adempiere">
+	</target>
+
+
+	<!-- ==================================================== -->
+	<!-- Test - Copy                                          -->
+	<!-- ==================================================== -->
+	<target name="testsystemCopy"
+		description="Copy Adempiere to Test System">
+
+		<delete dir="lib" />
+		<delete dir="wildfly" />
+		<delete dir="log" />
+		<unzip src="\\\\Dev1\\Adempiere\\Install\\Adempiere_253d.zip"
+			overwrite="true" />
+	</target>
+
+	<!-- ==================================================== -->
+	<!-- Test - Import DB                                     -->
+	<!-- ==================================================== -->
+	<target name="testsystemImport" depends="setup"
+		description="Import Adempiere DB">
+
+		<exec command="${basedir}/lib/RUN_AdempiereImport" />
+	</target>
+
+	<!-- ==================================================== -->
+	<!-- Test - Setup                                         -->
+	<!-- ==================================================== -->
+	<target name="testsystemSetup" depends="testsystemCopy, testsystemImport"
+		description="Set up Test System">
+
+	</target>
+
+	<!-- ==================================================== -->
+	<!-- Shutting down server, setting up adempiere and importing database -->
+	<!-- ==================================================== -->
+	<target name="cleanall" description="shutdown,settingup and importing database">
+
+		<echo message="================Adempiere Server Shutdown ===================" />
+		<echo message="OS      = ${os.name}" />
+
+		<!-- Shutting down server by calling the RUN_Stop.bat  or RUN_Stop.sh script in Adempiere dir	-->
+		<exec dir="${env.ADEMPIERE_HOME}\utils" executable="cmd" os="Windows XP, Windows 2000, Windows NT" >
+		  <arg line="/c RUN_Stop.bat"/>
+		</exec>
+
+		<exec dir="${env.ADEMPIERE_HOME}\utils" executable="/bin/sh" os="SunOS,unix">
+		  <arg value="-c" />
+		  <arg value="RUN_Stop.sh" />
+		</exec>
+
+		<echo message="================Adempiere Server Shutdown Complete===================" />
+		<sleep seconds="2"/>
+		<!-- Deleting all the log files, wildfly dir and log dir in ${env.ADEMPIERE_HOME} directory -->
+		<delete>
+			<fileset dir="${env.ADEMPIERE_HOME}" includes="*.log" />
+		</delete>
+		<!--delete dir="${ADEMPIERE_APPS_DEPLOY}/deployments" /-->
+		<delete dir="${env.ADEMPIERE_HOME}\log" />
+
+		<echo message="=========== ftp to nas and download the current build==============="/>
+		<ftp action= "get"
+			server="${server}"
+			userid="guest"
+			password="">
+			<fileset  dir="${env.ADEMPIERE_HOME}">
+				<include name="**/Adempiere_393.zip"/>
+			</fileset>
+		</ftp>
+
+		<!-- unzip and overwrite them and delete the downloaded directory -->
+		<unzip src="${env.ADEMPIERE_HOME}/Disk 1/Adempiere_393.zip" dest="${env.ADEMPIERE_HOME}\..\"  overwrite="yes" />
+		<delete dir="${env.ADEMPIERE_HOME}/Disk 1"/>
+
+		<echo message="======================Setup adempiere==============================" />
+		<ant inheritAll="false" dir="${env.ADEMPIERE_HOME}" target="setup"/>
+
+		<!-- Importing the database -->
+		<exec dir="${env.ADEMPIERE_HOME}\utils" executable="cmd" os="Windows XP, Windows 2000, Windows NT" >
+		  <arg line="/c  RUN_ImportAdempiere.bat"/>
+		</exec>
+		<exec dir="${env.ADEMPIERE_HOME}\utils" executable="/bin/sh" os="SunOS,unix">
+		  <arg value="-c" />
+		  <arg value="RUN_ImportAdempiere.sh" />
+		</exec>
+	</target>
+</project>

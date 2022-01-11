@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CompilerConfiguration">
+    <option name="BUILD_PROCESS_HEAP_SIZE" value="1700" />
+    <excludeFromCompile>
+      <file url="file://$PROJECT_DIR$/org.adempiere.test/src/main/scala/org/eevolution/test/AdempiereTestCase.scala" />
+    </excludeFromCompile>
+    <wildcardResourcePatterns>
+      <entry name="!?*.java" />
+      <entry name="!?*.form" />
+      <entry name="!?*.class" />
+      <entry name="!?*.groovy" />
+      <entry name="!?*.scala" />
+      <entry name="!?*.flex" />
+      <entry name="!?*.kt" />
+      <entry name="!?*.clj" />
+    </wildcardResourcePatterns>
+  </component>
+  <component name="JavacSettings">
+    <option name="ADDITIONAL_OPTIONS_OVERRIDE">
+      <module name="adempiere" options="--add-exports java.desktop/sun.swing=ALL-UNNAMED --add-exports java.desktop/sun.awt=ALL-UNNAMED --add-exports java.base/sun.security.provider=ALL-UNNAMED --add-exports java.naming/com.sun.jndi.ldap=ALL-UNNAMED" />
+    </option>
+  </component>
+</project>
